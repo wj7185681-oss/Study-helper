@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Helper - V14.1 Global</title>
+    <title>Study Helper - V14.2 Global</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <style>
@@ -12,7 +12,7 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); max-width: 500px; margin: auto; padding: 15px; transition: 0.3s; }
         .container { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .user-badge { font-size: 0.7rem; background: rgba(93, 173, 226, 0.1); color: var(--primary); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--primary); }
-        h1.main-title { text-align: center; font-size: 1.8rem; font-weight: 800; letter-spacing: 2px; margin: 15px 0; color: var(--primary); text-shadow: 0 0 10px rgba(93,173,226,0.3); }
+        h1.main-title { text-align: center; font-size: 1.8rem; font-weight: 800; letter-spacing: 2px; margin: 15px 0 5px; color: var(--primary); text-shadow: 0 0 10px rgba(93,173,226,0.3); }
         h2 { border-left: 5px solid var(--primary); padding-left: 10px; font-size: 1.1rem; margin: 25px 0 10px; color: var(--primary); }
         .input-group { display: flex; gap: 8px; margin-bottom: 12px; }
         input, select { padding: 10px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none; flex: 1; }
@@ -39,6 +39,12 @@
     </div>
 
     <h1 class="main-title">Study Helper</h1>
+    
+    <div style="text-align:center; margin-bottom:10px;">
+        <button onclick="promptID()" style="background:rgba(93,173,226,0.15); color:var(--primary); font-size:0.7rem; border:1px solid var(--primary); padding:4px 12px; border-radius:15px;">
+            🔑 <span id="txt_change_id">切換空間 ID</span>
+        </button>
+    </div>
 
     <h2 id="title_exams">📅 考試倒數</h2>
     <div class="input-group">
@@ -119,7 +125,8 @@
             btn_save: "儲存", btn_reset: "重設", sBtn: "開始", sBtn_pause: "暫停", sBtn_cont: "繼續",
             title_stats: "📈 本週數據統計", table_head: "<th>科目</th><th>時數</th><th>占比</th>",
             title_logs: "📊 學習紀錄 (全部)", sub_placeholder: "新增科目...", subj_default: "自主學習",
-            done: "已讀", remain: "剩餘", left: "剩", day: "天", no_data: "尚無數據"
+            done: "已讀", remain: "剩餘", left: "剩", day: "天", no_data: "尚無數據",
+            txt_change_id: "切換空間 ID", prompt_id: "請輸入您的專屬空間 ID (英文或數字):"
         },
         en: {
             title_exams: "📅 Exam Countdown", btn_add_ev: "Add", ev_placeholder: "Exam Name",
@@ -129,18 +136,23 @@
             btn_save: "Save", btn_reset: "Reset", sBtn: "Start", sBtn_pause: "Pause", sBtn_cont: "Resume",
             title_stats: "📈 Weekly Stats", table_head: "<th>Subject</th><th>Time</th><th>%</th>",
             title_logs: "📊 Study Logs (All)", sub_placeholder: "Add subject...", subj_default: "Self-study",
-            done: "Done", remain: "Remain", left: "", day: "d left", no_data: "No data"
+            done: "Done", remain: "Remain", left: "", day: "d left", no_data: "No data",
+            txt_change_id: "Switch Space ID", prompt_id: "Enter your custom Space ID (letters/numbers):"
         }
     };
 
-    function toggleLang() {
-        state.lang = state.lang === 'tw' ? 'en' : 'tw';
-        render();
-        sync();
+    function promptID() {
+        const msg = i18n[state.lang].prompt_id;
+        const newID = prompt(msg, userID);
+        if (newID && newID !== userID) {
+            window.location.href = window.location.pathname + '?id=' + encodeURIComponent(newID);
+        }
     }
 
+    function toggleLang() { state.lang = state.lang === 'tw' ? 'en' : 'tw'; render(); sync(); }
+
     function loadData() {
-        db.ref('users_v14_1/' + userID).on('value', (snap) => {
+        db.ref('users_v14_2/' + userID).on('value', (snap) => {
             const data = snap.val();
             if (data) {
                 state.evs = data.evs || []; state.logs = data.logs || []; state.subs = data.subs || []; 
@@ -150,7 +162,7 @@
         });
     }
 
-    function sync() { db.ref('users_v14_1/' + userID).set(state); }
+    function sync() { db.ref('users_v14_2/' + userID).set(state); }
 
     function syncPomoInput() {
         if (state.running) return;
@@ -170,118 +182,8 @@
     }
 
     function toggleTimer() {
-        const t = i18n[state.lang];
         if (state.running) {
             clearInterval(state.timer); state.running = false;
-            document.getElementById('sBtn').innerText = t.sBtn_cont;
+            document.getElementById('sBtn').innerText = i18n[state.lang].sBtn_cont;
         } else {
-            if (state.mode === 'pomo' && (state.sec === 0 || state.pomoInitialSec === 0)) syncPomoInput();
-            state.running = true;
-            document.getElementById('sBtn').innerText = t.sBtn_pause;
-            state.timer = setInterval(tick, 1000);
-        }
-    }
-
-    function tick() {
-        if (state.mode === 'study') { state.sec++; } 
-        else {
-            state.sec--;
-            if (state.sec <= 0) {
-                clearInterval(state.timer); state.running = false;
-                if (!state.isRest) { saveRecord(state.pomoInitialSec); alert("Done!"); }
-                state.isRest = !state.isRest;
-                const nextMin = state.isRest ? document.getElementById('rMin').value : document.getElementById('pMin').value;
-                state.pomoInitialSec = nextMin * 60; state.sec = state.pomoInitialSec;
-                document.getElementById('sBtn').innerText = i18n[state.lang].sBtn;
-            }
-        }
-        updateDisplay();
-    }
-
-    function manualSave() {
-        let dur = (state.mode === 'study') ? state.sec : (state.pomoInitialSec - state.sec);
-        if (dur > 0) { saveRecord(dur); resetTimer(); }
-    }
-
-    function saveRecord(duration) {
-        state.logs.unshift({ id: Date.now(), subject: document.getElementById('subj').value, duration: duration, date: new Date().toLocaleDateString() });
-        sync();
-    }
-
-    function resetTimer() {
-        clearInterval(state.timer); state.running = false; state.isRest = false;
-        if (state.mode === 'pomo') {
-            state.pomoInitialSec = document.getElementById('pMin').value * 60;
-            state.sec = state.pomoInitialSec;
-        } else { state.sec = 0; }
-        updateDisplay();
-        document.getElementById('sBtn').innerText = i18n[state.lang].sBtn;
-    }
-
-    function updateDisplay() {
-        const h = Math.floor(state.sec/3600), m = Math.floor((state.sec%3600)/60), s = state.sec%60;
-        document.getElementById('tDisp').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-    }
-
-    function render() {
-        const t = i18n[state.lang];
-        document.getElementById('userTag').innerText = "🔑 ID: " + userID;
-        document.getElementById('title_exams').innerText = t.title_exams;
-        document.getElementById('btn_add_ev').innerText = t.btn_add_ev;
-        document.getElementById('evName').placeholder = t.ev_placeholder;
-        document.getElementById('title_goals').innerText = t.title_goals;
-        document.getElementById('btn_set_goal').innerText = t.btn_set_goal;
-        document.getElementById('goalHourInput').placeholder = t.goal_hr_placeholder;
-        document.getElementById('title_timer').innerText = t.title_timer;
-        document.getElementById('mStudy').innerText = t.mStudy;
-        document.getElementById('mPomo').innerText = t.mPomo;
-        document.getElementById('txt_focus').innerText = t.txt_focus;
-        document.getElementById('txt_rest').innerText = t.txt_rest;
-        document.getElementById('txt_min').innerText = t.txt_min;
-        document.getElementById('txt_min2').innerText = t.txt_min2;
-        document.getElementById('btn_save').innerText = t.btn_save;
-        document.getElementById('btn_reset').innerText = t.btn_reset;
-        document.getElementById('title_stats').innerText = t.title_stats;
-        document.getElementById('table_head').innerHTML = t.table_head;
-        document.getElementById('title_logs').innerText = t.title_logs;
-        document.getElementById('newSubName').placeholder = t.sub_placeholder;
-        if(!state.running) document.getElementById('sBtn').innerText = t.sBtn;
-
-        const today = new Date().setHours(0,0,0,0);
-        const curWeekStart = new Date(); curWeekStart.setDate(curWeekStart.getDate() - curWeekStart.getDay()); curWeekStart.setHours(0,0,0,0);
-
-        document.getElementById('evList').innerHTML = state.evs.map(ev => `
-            <div class="item"><span>${ev.n}</span><span>${t.left} ${Math.ceil((new Date(ev.d)-today)/86400000)} ${t.day} <span style="color:red;cursor:pointer" onclick="delEv(${ev.id})">✕</span></span></div>
-        `).join('');
-
-        document.getElementById('subGroup').innerHTML = state.subs.map(s => `<div class="sub-tag"><span onclick="document.getElementById('subj').value='${s}'">${s}</span><span style="margin-left:5px;color:red" onclick="delSub('${s}')">×</span></div>`).join('');
-        document.getElementById('goalSubSelect').innerHTML = state.subs.map(s => `<option value="${s}">${s}</option>`).join('');
-
-        let weekTotalSec = 0; const weekStats = {};
-        document.getElementById('logList').innerHTML = state.logs.map(l => {
-            if (new Date(l.date) >= curWeekStart) { weekStats[l.subject] = (weekStats[l.subject] || 0) + l.duration; weekTotalSec += l.duration; }
-            return `<div class="item"><span><b>[${l.subject}]</b> ${Math.floor(l.duration/60)}m ${l.duration%60}s (${l.date})</span><span style="color:red;cursor:pointer" onclick="delLog(${l.id})">✕</span></div>`;
-        }).join('');
-
-        document.getElementById('statBody').innerHTML = Object.keys(weekStats).map(s => `
-            <tr><td>${s}</td><td>${Math.floor(weekStats[s]/3600)}h ${Math.floor((weekStats[s]%3600)/60)}m</td><td>${((weekStats[s]/weekTotalSec)*100).toFixed(1)}%</td></tr>
-        `).join('') || `<tr><td colspan="3">${t.no_data}</td></tr>`;
-
-        document.getElementById('goalList').innerHTML = state.goals.map(g => {
-            const done = weekStats[g.sub] || 0; const target = g.hour * 3600;
-            return `<div class="goal-item"><b>🎯 ${g.sub}</b><br>${t.done}: ${Math.floor(done/3600)}h ${Math.floor((done%3600)/60)}m | ${t.remain}: <span style="color:var(--secondary)">${Math.floor(Math.max(0,target-done)/3600)}h ${Math.floor((Math.max(0,target-done)%3600)/60)}m</span><span style="float:right;cursor:pointer" onclick="delGoal('${g.sub}')">✕</span></div>`;
-        }).join('');
-    }
-
-    function addSub() { const n = document.getElementById('newSubName').value.trim(); if(n && !state.subs.includes(n)) { state.subs.push(n); document.getElementById('newSubName').value=''; sync(); } }
-    function delSub(name) { if(confirm("Delete?")) { state.subs = state.subs.filter(s => s !== name); state.goals = state.goals.filter(g => g.sub !== name); sync(); } }
-    function addEv() { const n = document.getElementById('evName').value, d = document.getElementById('evDate').value; if(n && d) { state.evs.push({id:Date.now(), n, d}); sync(); } }
-    function delEv(id) { state.evs = state.evs.filter(e => e.id !== id); sync(); }
-    function delLog(id) { if(confirm("Delete?")) { state.logs = state.logs.filter(l => l.id !== id); sync(); } }
-    function addGoal() { const sub = document.getElementById('goalSubSelect').value, hr = parseFloat(document.getElementById('goalHourInput').value); if(sub && hr>0) { state.goals = state.goals.filter(g => g.sub !== sub); state.goals.push({sub, hour:hr}); sync(); } }
-    function delGoal(sub) { state.goals = state.goals.filter(g => g.sub !== sub); sync(); }
-
-    loadData();
-</script>
-</body>
-</html>
+            if (state
